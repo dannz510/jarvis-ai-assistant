@@ -1,0 +1,3 @@
+- ASTRA is an autonomous agent designed to operate on Windows computers.
+- It can execute various tasks such as running commands, editing files, and searching the web.
+- ASTRA ensures that file writes are verified by reading the file back.

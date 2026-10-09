@@ -92,15 +92,19 @@ def update_text(text):
 
 def create_file(text):
     selected_ex = get_file_extension(text)
+    if not selected_ex:
+        raise ValueError("Specify a supported file type, such as text file or Python file.")
     text = update_text(text)
     if "named" in text or "with name" in text:
         text = text.replace("named","")
         text = text.replace("with name","")
         text = text.replace("create","")
         text = text.strip()
-        with open(f"{text}{selected_ex}","w"):
-            pass
-    else :
-        with open(f"demo{selected_ex}","w"):
-            pass
+        filename = text if text.lower().endswith(selected_ex) else f"{text}{selected_ex}"
+    else:
+        filename = f"demo{selected_ex}"
+
+    from Features.file_agent import create_file as create_scoped_file
+
+    return create_scoped_file(filename)
 

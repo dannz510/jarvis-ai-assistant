@@ -1,5 +1,8 @@
 import re
-from os import getcwd
+from pathlib import Path
+from Brain.logger import logger
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def parse_input(input_text):
     # Regular expression to extract time in format like "07:30 PM" or "8:00pm"
@@ -46,10 +49,10 @@ def input_manage(input_text):
         output, time = parse_input(input_text)
 
         if output != "No valid time found in input":
-            save_to_file(output, time, r'C:\Users\chatu\OneDrive\Desktop\Jarvis\schedule.txt')
-            print("Schedule_Data_Saved")
+            save_to_file(output, time, PROJECT_ROOT / "schedule.txt")
+            logger.info("Schedule_Data_Saved")
         else:
-            print(output)
+            logger.warning(output)
 
 
 
@@ -78,14 +81,14 @@ def save_to_Alarmfile(time, filename):
         with open(filename, 'w') as file:
             file.write(str(time) + '\n')
     except FileNotFoundError:
-            print("fine not found")
+            logger.error("file not found")
 
 def input_manage_Alam(input_text):
         time = parse_input_Alarm(input_text)
 
         if time != "No valid time found in input":
-            save_to_Alarmfile(time, r'C:\Users\chatu\OneDrive\Desktop\Jarvis\Alam_data.txt')
-            print("Schedule_Data_Saved")
+            save_to_Alarmfile(time, PROJECT_ROOT / "Alam_data.txt")
+            logger.info("Alarm_Data_Saved")
         else:
-            print("pass")
+            logger.warning("No valid alarm time found in input")
 

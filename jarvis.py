@@ -3,11 +3,12 @@ from internet_check import is_Online
 from Alert import Alert
 from Data.DLG_Data import online_dlg,offline_dlg
 import random
-from co_brain import Jarvis
+from co_brain import AstraVoiceLoop
 from TextToSpeech.Fast_DF_TTS import speak
 from Automation.Battery  import check_plug
 from Time_Operations.throw_alert import check_schedule,check_Alam
 from os import getcwd
+from jarvis_runtime import get_runtime
 
 Alam_path = f"{getcwd()}\\Alam_data.txt"
 file_path = f'{getcwd()}\\schedule.txt'
@@ -16,12 +17,23 @@ ran_online_dlg = random.choice(online_dlg)
 ran_offline_dlg = random.choice(offline_dlg)
 
 
+def warmup_model_async():
+    """Warm up the Ollama model in background."""
+    def _warm():
+        runtime = get_runtime()
+        runtime.warm_model()
+    threading.Thread(target=_warm, daemon=True).start()
+
+
 def main():
     if is_Online():
+        # Start model warmup immediately (non-blocking)
+        warmup_model_async()
+        
         t1 = threading.Thread(target=speak,args=(ran_online_dlg,))
         t3 = threading.Thread(target=check_plug)
         t4 = threading.Thread(target=check_schedule,args=(file_path,))
-        t5 = threading.Thread(target=Jarvis)
+        t5 = threading.Thread(target=AstraVoiceLoop)
         t6 = threading.Thread(target=check_Alam,args=(Alam_path,))
         t1.start()
         t1.join()
@@ -36,4 +48,5 @@ def main():
     else:
         Alert(ran_offline_dlg)
 
-main()
+if __name__ == "__main__":
+    main()

@@ -1,16 +1,20 @@
 import os
+from pathlib import Path
 from winotify import Notification, audio
 from os import getcwd
+from branding import ASSISTANT_NAME, OWNER_NAME
 
 def Alert(Text):
-    icon_path = r"C:\Users\chatu\OneDrive\Desktop\Jarvis\logo.png"
+    icon_path = Path(__file__).resolve().parent / "assets" / "astra_logo.png"
+    notification = {
+        "app_id": f"{ASSISTANT_NAME} · {OWNER_NAME}",
+        "title": Text,
+        "duration": "long",
+    }
+    if icon_path.is_file():
+        notification["icon"] = str(icon_path)
 
-    toast = Notification(
-        app_id="🟢 J.A.R.V.I.S.",
-        title=Text,
-        duration="long",
-        icon=icon_path
-    )
+    toast = Notification(**notification)
 
     toast.set_audio(audio.Default, loop=False)
 

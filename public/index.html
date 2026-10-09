@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASTRA Nebula — Holographic Orb Visualizer</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+    }
+  }
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Outfit', 'Exo 2', sans-serif;
+      background: radial-gradient(ellipse at center, #07111d 0%, #05070f 70%, #000000 100%);
+      color: #e8f7ff;
+      height: 100vh;
+      width: 100vw;
+    }
+    #orb-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+    }
+    /* Holographic Control Panel */
+    #control-panel {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 10;
+      width: 360px;
+      padding: 0;
+      border-radius: 16px;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(10, 22, 36, 0.55);
+      border: 1px solid rgba(95, 235, 255, 0.22);
+      box-shadow: 0 0 40px rgba(95, 235, 255, 0.08),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+    #control-panel::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.66" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="matrix" values="0 0 0 0 0.2 0 0 0 0 0.6 0 0 0 0 0.95 0 0 0 0.02 0"/></filter><rect width="100%" height="100%" filter="url(%23n)"/></svg>');
+      opacity: 0.03;
+      pointer-events: none;
+    }
+    .panel-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid rgba(95, 235, 255, 0.12);
+      background: rgba(12, 26, 40, 0.65);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-header .icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+    .panel-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #4df4ff;
+      letter-spacing: 0.5px;
+      font-family: 'Oxanium', sans-serif;
+    }
+    .panel-body {
+      padding: 20px 24px;
+      position: relative;
+    }
+    .panel-body > *:not(:last-child) {
+      margin-bottom: 16px;
+    }
+    .status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .status-row .label {
+      font-size: 12px;
+      color: #9dc3da;
+      font-family: 'Outfit', sans-serif;
+    }
+    .status-row .value {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'Oxanium', sans-serif;
+      color: #4df4ff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-row .value.listening { color: #3df5d9; }
+    .status-row .value.thinking { color: #5cadff; }
+    .status-row .value.executing { color: #ffaa5e; }
+    .status-row .value.speaking { color: #69efff; }
+    .status-row .value.success { color: #6df2ab; }
+    .status-row .value.error { color: #ff7571; }
+
+    select, input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      margin-top: 6px;
+      border-radius: 10px;
+      border: 1px solid rgba(95, 235, 255, 0.22);
+      background: rgba(8, 20, 33, 0.92);
+      color: #e7f4fb;
+      font-size: 13px;
+      font-family: 'Outfit', sans-serif;
+      transition: border-color 0.18s ease;
+      outline: none;
+    }
+    select:focus, input:focus {
+      border-color: rgba(95, 235, 255, 0.6);
+      box-shadow: 0 0 0 2px rgba(95, 235, 255, 0.1);
+    }
+    button#btn-action {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      background: qlineargradient... /* fallback below */
+      background: linear-gradient(135deg, #0f9fc5 0%, #0a7fa3 100%);
+      color: white;
+      font-weight: 600;
+      font-size: 14px;
+      font-family: 'Outfit', sans-serif;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    button#btn-action:hover {
+      background: linear-gradient(135deg, #14b8e0 0%, #0d94bd 100%);
+      box-shadow: 0 0 20px rgba(95, 235, 255, 0.25);
+    }
+    button#btn-action:active {
+      transform: scale(0.97);
+    }
+    button#btn-action.recording {
+      background: linear-gradient(135deg, #ff6b66 0%, #ff4dff 100%);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* Audio level bars */
+    .audio-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 48px;
+      margin-top: 8px;
+      padding: 0 4px;
+    }
+    .audio-bar {
+      flex: 1;
+      min-width: 2px;
+      background: linear-gradient(180deg, #3df5d9 0%, #4df4ff 100%);
+      border-radius: 2px 2px 0 0;
+      transition: height 0.03s linear;
+      opacity: 0.7;
+    }
+    .audio-bar.low { background: #3df5d9; }
+    .audio-bar.mid { background: #4df4ff; }
+    .audio-bar.high { background: #9d7bff; }
+
+    /* Tooltip */
+    .tooltip {
+      position: relative;
+      display: inline-block;
+    }
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 200px;
+      background: rgba(8, 16, 26, 0.92);
+      color: #e8f7ff;
+      text-align: left;
+      border-radius: 8px;
+      padding: 8px 12px;
+      position: absolute;
+      z-index: 1;
+      bottom: 125%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      opacity: 0;
+      transition: opacity 0.2s;
+      border: 1px solid rgba(95, 235, 255, 0.3);
+      pointer-events: none;
+    }
+    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }
+    .tooltip .tooltiptext::after {
+      content: "";
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      margin-left: -5px;
+      border-width: 5px;
+      border-style: solid;
+      border-color: rgba(95, 235, 255, 0.3) transparent transparent transparent;
+    }
+  </style>
+</head>
+<body>
+  <!-- WebGL Canvas -->
+  <canvas id="orb-canvas"></canvas>
+
+  <!-- Holographic Control Panel -->
+  <div id="control-panel">
+    <div class="panel-header">
+      <span class="icon">◉</span>
+      <h3>ASTRA NEBULA CONTROLS</h3>
+    </div>
+
+    <div class="panel-body">
+      <!-- Status Row -->
+      <div class="status-row">
+        <span class="label">Orb State</span>
+        <span class="value" id="txt-state">IDLE</span>
+      </div>
+
+      <div class="status-row">
+        <span class="label">Audio Level</span>
+        <span class="value" id="txt-audio">0%</span>
+      </div>
+
+      <!-- Frequency Bands -->
+      <div class="audio-bars" id="audio-bars">
+        <div class="audio-bar low"  style="height:20%"></div>
+        <div class="audio-bar low"  style="height:35%"></div>
+        <div class="audio-bar mid"  style="height:10%"></div>
+        <div class="audio-bar mid"  style="height:50%"></div>
+        <div class="audio-bar mid"  style="height:25%"></div>
+        <div class="audio-bar high" style="height:15%"></div>
+        <div class="audio-bar high" style="height:40%"></div>
+        <div class="audio-bar high" style="height:10%"></div>
+        <div class="audio-bar high" style="height:30%"></div>
+        <div class="audio-bar high" style="height:20%"></div>
+      </div>
+
+      <!-- Model & API -->
+      <label for="model-select" style="font-size:11px; color:#6f93b3; font-family:'Outfit',sans-serif;">
+        Switch Model
+      </label>
+      <select id="model-select">
+        <option value="gemini-2.5-pro">Gemini 2.5 Pro (Default)</option>
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+        <option value="claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+        <option value="custom-llm">Custom API Endpoint</option>
+      </select>
+
+      <div class="tooltip" style="display:block; margin-top:8px;">
+        <span class="tooltiptext">Enter your AI API key for authenticated models.
+          Your key is stored securely and never sent to third parties.</span>
+        <input type="password" id="api-key-input" placeholder="sk-... or AIzaSy..." />
+      </div>
+
+      <!-- Mic Button -->
+      <button id="btn-action" class="tooltip">
+        <span class="tooltiptext">Toggle microphone + audio stream.
+          Starts voice recognition and mic-reactive orb animation.</span>
+        KÍCH HOẠT MIC & CHẠY
+      </button>
+
+      <!-- Footer -->
+      <div style="text-align:center; font-size:10px; color:#4a6b85; font-family:'Oxanium',sans-serif; margin-top:12px;">
+        LOCAL FIRST CORE · PRIVATE · SECURE
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js + Orb -->
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+
+    import OrbVisualizer from './orb.js';
+    import { ModelConfigRouter } from './planner.js';
+
+    const visualizer = new OrbVisualizer('orb-canvas', {
+        nodeCount: 78,
+        particleCount: 16,
+        enablePostProcessing: true,
+    });
+
+    const router = new ModelConfigRouter();
+    window.aiState = 'idle';
+
+    // Audio barge-in detector simulation
+    const detector = {
+        startListening: async () => {
+            const ok = await visualizer.startMicrophone();
+            if (!ok) {
+                document.getElementById('txt-state').innerText = 'MIC ERROR';
+                document.getElementById('txt-state').className = 'value error';
+            }
+            return ok;
+        },
+    };
+
+    // Update model/API route
+    document.getElementById('model-select').addEventListener('change', (e) => {
+        const key = document.getElementById('api-key-input').value;
+        router.setRoute(e.target.value, key);
+    });
+
+    let micActive = false;
+    document.getElementById('btn-action').addEventListener('click', async () => {
+        if (!micActive) {
+            const ok = await detector.startListening();
+            if (!ok) return;
+
+            micActive = true;
+            const btn = document.getElementById('btn-action');
+            btn.classList.add('recording');
+            btn.innerText = '🔴 DỪNG MIC';
+
+            // Simulate context lifecycle
+            visualizer.setContextState('listening');
+            document.getElementById('txt-state').innerText = 'LISTENING (Barge-in Ready!)';
+            document.getElementById('txt-state').className = 'value listening';
+
+            setTimeout(() => {
+                window.aiState = 'thinking';
+                visualizer.setContextState('thinking');
+                document.getElementById('txt-state').innerText = 'THINKING (Multi-step Planning)';
+                document.getElementById('txt-state').className = 'value thinking';
+            }, 3000);
+
+            setTimeout(() => {
+                window.aiState = 'speaking';
+                visualizer.setContextState('speaking');
+                document.getElementById('txt-state').innerText = 'SPEAKING (Response Active)';
+                document.getElementById('txt-state').className = 'value speaking';
+            }, 7000);
+
+            setTimeout(() => {
+                visualizer.setContextState('idle');
+                document.getElementById('txt-state').innerText = 'IDLE';
+                document.getElementById('txt-state').className = 'value';
+                btn.classList.remove('recording');
+                btn.innerText = 'KÍCH HOẠT MIC & CHẠY';
+                micActive = false;
+                visualizer.stopMicrophone();
+            }, 12000);
+        } else {
+            visualizer.stopMicrophone();
+            visualizer.setContextState('idle');
+            document.getElementById('txt-state').innerText = 'IDLE';
+            document.getElementById('txt-state').className = 'value';
+            const btn = document.getElementById('btn-action');
+            btn.classList.remove('recording');
+            btn.innerText = 'KÍCH HOẠT MIC & CHẠY';
+            micActive = false;
+        }
+    });
+
+    // Live audio bar updates
+    setInterval(() => {
+        const bands = visualizer.frequencyBands;
+        const bars = document.querySelectorAll('.audio-bar');
+        bars.forEach((bar, i) => {
+            const bandVal = i < 3 ? bands.low : (i < 6 ? bands.mid : bands.high);
+            const height = Math.max(5, bandVal * 100);
+            bar.style.height = height + '%';
+        });
+
+        const audioPercent = Math.round(visualizer.audioLevel * 100);
+        document.getElementById('txt-audio').innerText = audioPercent + '%';
+
+        const state = visualizer.state.toUpperCase();
+        // Only update if state text doesn't already contain context info
+        const stateEl = document.getElementById('txt-state');
+        if (stateEl.innerText === 'IDLE' || stateEl.innerText === '') {
+            stateEl.innerText = state;
+            stateEl.className = 'value';
+        }
+    }, 50);
+
+    // Expose for debugging
+    window.visualizer = visualizer;
+    window.orbBridge = {
+        setState: (s) => visualizer.setContextState(s),
+        setAudio: (v, b) => visualizer.setAudioLevel(v, b),
+        pulse: () => visualizer.triggerPulse(),
+    };
+  </script>
+</body>
+</html>

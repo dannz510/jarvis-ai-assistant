@@ -1,6 +1,7 @@
 requests
 
 winotify
+OpenJarvis==1.0.4
 
 pyautogui
 
@@ -27,6 +28,8 @@ yaspin
 opencv-python
 
 pyaudio
+vosk
+webrtcvad-wheels==2.0.14.post1
 
 scipy
 
@@ -35,3 +38,13 @@ wmi
 comtypes
 
 pycaw
+PyQt5
+pygame
+ollama
+pywin32
+pywinauto==0.6.9
+pypdf
+python-docx
+openpyxl
+python-pptx
+reportlab

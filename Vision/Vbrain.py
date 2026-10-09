@@ -1,82 +1,77 @@
-import requests
-import json
+"""Local camera capture and image understanding through Ollama vision models."""
+
 import base64
+import json
+import os
+from pathlib import Path
+
 import cv2
+import requests
+
+
+DEFAULT_VISION_MODEL = os.environ.get("ASTRA_VISION_MODEL", "gemma3:4b").strip()
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+VISION_TIMEOUT_SECONDS = float(os.environ.get("ASTRA_VISION_TIMEOUT", "45"))
+
 
 def capture_image_and_save(image_path="captured_image.png"):
-    # Initialize the camera
-    cap = cv2.VideoCapture(0)  # 0 is the default camera
-
-    if not cap.isOpened():
-        print("Error: Could not open camera.")
-        return False
-
+    device_setting = os.environ.get("ASTRA_CAMERA_INDEX", "0").strip()
     try:
-        # Capture a single frame
-        ret, frame = cap.read()
-
-        if ret:
-            # Save the image in PNG format
-            cv2.imwrite(image_path, frame)
-            print(f"Image captured and saved as {image_path}")
-            return True
-        else:
-            print("Error: Could not capture image.")
+        device_index = int(device_setting)
+    except ValueError as exc:
+        raise ValueError("ASTRA_CAMERA_INDEX must be an integer camera index.") from exc
+    camera = cv2.VideoCapture(device_index)
+    if not camera.isOpened():
+        camera.release()
+        return False
+    try:
+        captured, frame = camera.read()
+        if not captured:
             return False
+        target = Path(image_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        return bool(cv2.imwrite(str(target), frame))
     finally:
-        # Release the camera
-        cap.release()
-        cv2.destroyAllWindows()
+        camera.release()
 
-# Function to encode an image to Base64
+
 def encode_image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-    return encoded_string
+    return base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
 
-def vision_brain(encoded_image):
-    url = "https://api.deepinfra.com/v1/openai/chat/completions"
 
-    headers = {
-        "accept": "text/event-stream",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36 Edg/127.0.0.0",
-        "x-deepinfra-source": "model-embed"
-    }
-
+def vision_brain(encoded_image, prompt="Describe the image and read any visible text.", model=None):
+    if not encoded_image:
+        raise ValueError("Image data is empty.")
+    selected_model = model or DEFAULT_VISION_MODEL
     payload = {
-        "model": "llava-hf/llava-1.5-7b-hf",
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{encoded_image}"
-                        }
-                    },
-                    {
-                        "type": "text",
-                        "text": "What is written in this image?"
-                    }
-                ]
-            }
-        ]
+        "model": selected_model,
+        "messages": [{
+            "role": "user",
+            "content": str(prompt),
+            "images": [encoded_image],
+        }],
+        "stream": False,
+        "options": {"temperature": 0.2},
     }
-
-    # Convert the payload to JSON
-    payload_json = json.dumps(payload)
-
-    # Make the POST request
-    response = requests.post(url, headers=headers, data=payload_json)
-
-    # Check if the request was successful
-    if response.status_code == 200:
-        response_str = response.content.decode('utf-8')
-        data = json.loads(response_str)
-        answer = data['choices'][0]['message']['content']
+    try:
+        response = requests.post(
+            f"{OLLAMA_HOST}/api/chat",
+            json=payload,
+            timeout=(3, VISION_TIMEOUT_SECONDS),
+        )
+        response.raise_for_status()
+        data = response.json()
+        answer = data.get("message", {}).get("content", "").strip()
+        if not answer:
+            raise RuntimeError("The local vision model returned an empty response.")
         return answer
-    else:
-        print(f"Error: API request failed with status code {response.status_code}")
-        return None
-
+    except requests.RequestException as exc:
+        detail = str(exc)
+        if getattr(exc, "response", None) is not None and exc.response is not None:
+            try:
+                detail = exc.response.json().get("error", detail)
+            except (ValueError, json.JSONDecodeError):
+                pass
+        raise RuntimeError(
+            f"Local vision is unavailable for {selected_model}. Check Ollama and install the model. {detail}"
+        ) from exc

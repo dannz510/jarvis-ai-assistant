@@ -14,3 +14,4 @@ def openweb(webname):
         webbrowser.open(url) 
     if urls_to_open:
         print("opening...")
+    return bool(urls_to_open)

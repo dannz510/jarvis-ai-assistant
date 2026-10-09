@@ -12,7 +12,9 @@ from Automation.Youtube_play_back import perform_media_action
 import pywhatkit
 from Automation.scrool_system import perform_scroll_action
 import threading
+from threading import Event
 from TextToSpeech.Fast_DF_TTS import speak
+import re
 
 def play():
     gui.press("space")
@@ -29,64 +31,66 @@ def search(text):
     gui.write(text)
 
 def Open_Brain(text):
-    if "website" in text or "open website named" in text:
-        text = text.replace("open","").strip()
-        text = text.replace("website","").strip()
-        text = text.replace("open website named","").strip()
-        t1 = threading.Thread(target=speak,args=(f"Navigating {text} website",))
-        t2 = threading.Thread(target=openweb,args=(text,))
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+    request = str(text).strip()
+    if "website" in request.casefold():
+        website = re.sub(r"^open\s+website(?:\s+named)?\s*", "", request, flags=re.I).strip()
+        if openweb(website):
+            speak(f"Opened {website} website.")
+        else:
+            speak(f"I do not have a trusted address for {website}.")
     else:
-        text = text.replace("open","").strip()
-        text = text.replace("app","").strip()
-        t1 = threading.Thread(target=speak,args=(f"Navigating {text} application",))
-        t2 = threading.Thread(target=open_App,args=(text,))
-        t1.start()
-        t2.start()
-        t1.join()
-        t2.join()
+        application = re.sub(r"^open\s+", "", request, flags=re.I).strip()
+        try:
+            open_App(application)
+            speak(f"Opened {application}.")
+        except (OSError, RuntimeError, ValueError) as exc:
+            speak(f"I could not open {application}: {exc}")
         
 def clear_file():
     with open(f"{getcwd()}\\input.txt","w") as file:
         file.truncate(0)
 
-def Auto_main_brain(text):
+def _wait_for_song_name(stop_event=None, timeout_seconds=20):
+    """Wait briefly for the next recognized phrase without trapping voice control."""
+    stop_event = stop_event or Event()
+    deadline = time.monotonic() + timeout_seconds
+    last_text = ""
+    while not stop_event.is_set() and time.monotonic() < deadline:
+        try:
+            with open("input.txt", "r", encoding="utf-8") as file:
+                current_text = file.read().strip().lower()
+        except (OSError, UnicodeError):
+            current_text = ""
+        if current_text and current_text != last_text:
+            clear_file()
+            return current_text
+        time.sleep(0.1)
+    return ""
+
+
+def Auto_main_brain(text, stop_event=None):
    try: 
     if text.startswith("open"):
         Open_Brain(text)
     elif "close" in text:
         close()
     elif "play music" in text or "play music on youtube" in text:
-        Fast_DF_TTS.speak("which song do you want to play sir.")
+        Fast_DF_TTS.speak("Which song would you like to play?")
         clear_file()
-        output_text = ""
-        while True:
-            with open("input.txt","r") as file:
-                input_text = file.read().lower()
-            if input_text != output_text:
-                output_text = input_text
-                if output_text.endswith("song"):
-                    play_music_on_youtube(output_text)
-                    break
-                    
-        else:
-            pass
+        song = _wait_for_song_name(stop_event)
+        if song:
+            play_music_on_youtube(song)
+        elif stop_event is None or not stop_event.is_set():
+            Fast_DF_TTS.speak("I did not receive a song name. Please try again.")
         
     elif "play some music" in text or "play music on spotify" in text:
-        Fast_DF_TTS.speak("Which song do you want to play, sir.")
+        Fast_DF_TTS.speak("Which song would you like to play on Spotify?")
         clear_file()
-        output_text = ""
-        while True:
-            with open("input.txt", "r") as file:
-                input_text = file.read().lower()
-            if input_text != output_text:
-                output_text = input_text
-                if output_text.endswith("song"):
-                    play_music_on_spotify(output_text)
-                    break
+        song = _wait_for_song_name(stop_event)
+        if song:
+            play_music_on_spotify(song)
+        elif stop_event is None or not stop_event.is_set():
+            Fast_DF_TTS.speak("I did not receive a song name. Please try again.")
 
     elif "check battery percentage" in text or "check battery level" in text:
         check_percentage()
@@ -115,7 +119,7 @@ def Auto_main_brain(text):
         perform_browser_action(text)
         perform_media_action(text)
         perform_scroll_action(text)
-        
+
    except Exception as e:
-       print("error : " + e)
-       
+       print(f"error : {e}")
+

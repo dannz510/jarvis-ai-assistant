@@ -1,15 +1,19 @@
-import wmi
-from TextToSpeech.Fast_DF_TTS import speak
-def get_brightness_windows():
+"""Brightness percentage check stub (Windows)."""
+
+import subprocess
+
+
+def check_br_persentage() -> str:
+    """Get current display brightness percentage."""
     try:
-        w = wmi.WMI(namespace='wmi')
-        brightness_methods = w.WmiMonitorBrightness()
-        brightness_percentage = brightness_methods[0].CurrentBrightness
-        return brightness_percentage
-    except Exception as e:
-        return f"Error: {e}"
-
-def check_br_persentage():
-    brightness = get_brightness_windows()
-    speak(f"Current Brightness: {brightness}%")
-
+        # WMI: WmiMonitorBrightness is not always available; use Win32_DesktopMonitor + PowerShell
+        cmd = [
+            "powershell", "-NoProfile", "-Command",
+            "(Get-WmiObject -Namespace root/wmi -Class WmiMonitorBrightness -ErrorAction SilentlyContinue).CurrentBrightness"
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+        if result.returncode == 0 and result.stdout.strip().isdigit():
+            return f"Brightness: {result.stdout.strip()}%"
+    except Exception:
+        pass
+    return "Brightness info unavailable (WMI not supported or no external monitor)."

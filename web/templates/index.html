@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import html
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+
+from core.config import get_config
+
+
+def render_index() -> str:
+    return """<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASTRA – Web Control Center</title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+</head>
+<body>
+  <header class="header">
+    <h1>ASTRA Web Control Center</h1>
+    <nav class="nav">
+      <a href="#dashboard" class="nav-link">Dashboard</a>
+      <a href="#storage" class="nav-link">Storage</a>
+      <a href="#chat" class="nav-link">Chat</a>
+      <a href="#metrics" class="nav-link">Metrics</a>
+      <a href="#audit" class="nav-link">Audit</a>
+      <a href="#settings" class="nav-link">Settings</a>
+    </nav>
+  </header>
+  <main class="container">
+    <section id="dashboard" class="panel">
+      <h2>Dashboard</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Usage over time</h3>
+          <canvas id="chartUsage"></canvas>
+        </div>
+        <div class="card">
+          <h3>Tokens</h3>
+          <canvas id="chartTokens"></canvas>
+        </div>
+        <div class="card">
+          <h3>Storage</h3>
+          <canvas id="chartStorage"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section id="storage" class="panel">
+      <h2>Storage Management</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>Overview</h3>
+          <pre id="storageOverview">loading...</pre>
+        </div>
+        <div class="card">
+          <h3>Tree</h3>
+          <pre id="storageTree">loading...</pre>
+        </div>
+      </div>
+      <div class="actions">
+        <button hx-post="/api/storage/retention/apply" hx-target="#retRes">Apply retention</button>
+        <button hx-post="/api/storage/purge/expired" hx-target="#retRes">Purge expired</button>
+        <span id="retRes"></span>
+      </div>
+    </section>
+
+    <section id="chat" class="panel">
+      <h2>Chat (linked)</h2>
+      <div class="chat-wrap">
+        <div class="sessions" id="sessions" hx-get="/api/chat/sessions" hx-trigger="load"></div>
+        <div class="messages" id="messages"></div>
+      </div>
+    </section>
+
+    <section id="metrics" class="panel">
+      <h2>Metrics & Charts</h2>
+      <div class="grid">
+        <div class="card"><h3>Duration</h3><canvas id="chartDuration"></canvas></div>
+        <div class="card"><h3>Cache</h3><canvas id="chartCache"></canvas></div>
+        <div class="card"><h3>Ops</h3><canvas id="chartOps"></canvas></div>
+      </div>
+    </section>
+
+    <section id="audit" class="panel">
+      <h2>Audit (immutable)</h2>
+      <div class="card"><pre>read-only by design</pre></div>
+    </section>
+
+    <section id="settings" class="panel">
+      <h2>Settings / Security</h2>
+      <div class="card"><pre>PII redaction, at-rest, local-only</pre></div>
+    </section>
+  </main>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>"""

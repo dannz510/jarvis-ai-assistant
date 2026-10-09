@@ -1,20 +1,23 @@
 import pywhatkit as kit
 import datetime
+import os
+import time
 from TextToSpeech.Fast_DF_TTS import speak
 from os import getcwd
+from branding import OWNER_NAME
 
-now = datetime.datetime.now()
-hour = now.hour
-minute = now.minute
+WHATSAPP_NUMBER = os.environ.get("ASTRA_DANNZ_WHATSAPP", "").strip()
 
 def clear_file():
     with open(f"{getcwd()}\\input.txt","w") as file:
         file.truncate(0)
         
-anubhav = "+919606348280"
-
 def send_msg_wa():
-    speak("who do you want to send sir ?")
+    if not WHATSAPP_NUMBER:
+        speak("Set ASTRA_DANNZ_WHATSAPP to your WhatsApp number before sending messages.")
+        return
+
+    speak(f"Do you want to send a message to {OWNER_NAME}?")
     output_text = ""
     while True:
         with open("input.txt","r") as file:
@@ -22,9 +25,8 @@ def send_msg_wa():
         if input_text != output_text:
             output_text = input_text
             if output_text.startswith("send to") or output_text.startswith("send tu"):
-                output_text.replace("send to","")
-                output_text.replace("send tu","")
-                if "anubhav" in output_text:
+                recipient = output_text.replace("send to", "", 1).replace("send tu", "", 1).strip()
+                if OWNER_NAME.lower() in recipient:
                     speak("By the way what is the message , sir ?")
                     while True:
                        with open("input.txt","r") as file:
@@ -32,8 +34,12 @@ def send_msg_wa():
                           if input_text != output_text:
                               output_text = input_text
                               if output_text.startswith("message is"):
-                                  message =  output_text.replace("message is","")
-                                  kit.sendwhatmsg(anubhav,message,hour,minute+1)
+                                  message = output_text.replace("message is", "", 1).strip()
+                                  send_time = datetime.datetime.now() + datetime.timedelta(minutes=1)
+                                  kit.sendwhatmsg(WHATSAPP_NUMBER, message, send_time.hour, send_time.minute)
                                   speak("message send successfully")
-                                 
+                                  return
+                       time.sleep(0.1)
+        time.sleep(0.1)
+
 

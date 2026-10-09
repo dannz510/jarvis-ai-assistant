@@ -1,89 +1,59 @@
-import os
+import schedule
 import time
 import threading
-from Alert import Alert
-from TextToSpeech.Fast_DF_TTS import speak
-import threading
-from Time_Operations.brain import input_manage
-from os import getcwd
+from pathlib import Path
+from Brain.logger import logger
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-
-
-def load_schedule(file_path):
-    schedule = {}
+def check_schedule():
+    """Check schedule.txt for due tasks."""
+    schedule_file = PROJECT_ROOT / "schedule.txt"
+    if not schedule_file.exists():
+        return
+    
+    current_time = time.strftime("%H:%M%p").upper()
     try:
-        with open(file_path, 'r') as file:
-            for line in file:
-                if '=' in line:
-                    line_time, activity = line.strip().split(' = ')
-                    schedule[line_time.strip()] = activity.strip()
+        with open(schedule_file, 'r') as f:
+            lines = f.readlines()
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith(current_time):
+                task = line.split("=", 1)[1].strip() if "=" in line else line
+                logger.info(f"Schedule due: {task}")
+                # Could trigger notification here
     except Exception as e:
-        print(f"Error loading schedule: {e}")
-    return schedule
+        logger.error(f"Error checking schedule: {e}")
 
-def check_schedule(file_path):
-    last_modified = 0
-    while True:
-        current_time = time.strftime("%I:%M%p")
-        try:
-            # Check file modification time
-            modified = os.path.getmtime(file_path)
-            if modified != last_modified:
-                last_modified = modified
-                schedule = load_schedule(file_path)
-            
-            if current_time in schedule:
-                text = schedule[current_time]
-                t1 = threading.Thread(target=Alert, args=(text,))
-                t2 = threading.Thread(target=speak, args=(text,))
-                t1.start()
-                t2.start()
-                t1.join()
-                t2.join()
-        
-        except Exception as e:
-            print(f"Error: {e}")
-        
-        time.sleep(60)
-
-
-def load_AlamTime(file_path):
-    schedule = {}
+def check_Alam():
+    """Check Alam_data.txt for due alarms."""
+    alam_file = PROJECT_ROOT / "Alam_data.txt"
+    if not alam_file.exists():
+        return
+    
+    current_time = time.strftime("%H:%M%p").upper()
     try:
-        with open(file_path, 'r') as file:
-            schedule = file.read()
+        with open(alam_file, 'r') as f:
+            alarm_time = f.read().strip().upper()
+        
+        if alarm_time == current_time:
+            logger.info("Alarm triggered!")
+            # Could trigger alarm sound here
+            return True
     except Exception as e:
-        print(f"Error loading schedule: {e}")
-    return schedule
+        logger.error(f"Error checking alarm: {e}")
+    
+    return False
 
-Alam_path = r"C:\Users\chatu\OneDrive\Desktop\Jarvis\Alam_data.txt"
-
-def check_Alam(Alam_path):
-    last_modified = 0
-    while True:
-        current_time = time.strftime("%I:%M%p")
-        try:
-            # Check file modification time
-            modified = os.path.getmtime(Alam_path)
-            if modified != last_modified:
-                last_modified = modified
-                schedule = load_AlamTime(Alam_path)
-            
-            if current_time in schedule:
-                text = "This is Alarm"
-                t1 = threading.Thread(target=Alert, args=(text,))
-                t2 = threading.Thread(target=speak, args=(text,))
-                t1.start()
-                t2.start()
-                t1.join()
-                t2.join()
-        
-        except Exception as e:
-            print(f"Error: {e}")
-        
-        time.sleep(10)
-
-
-
-
+def start_schedule_checker(interval_seconds=30):
+    """Start background thread to check schedule and alarms."""
+    def run_checker():
+        while True:
+            check_schedule()
+            check_Alam()
+            time.sleep(interval_seconds)
+    
+    thread = threading.Thread(target=run_checker, daemon=True)
+    thread.start()
+    return thread
